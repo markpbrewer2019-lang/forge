@@ -1,0 +1,27 @@
+{
+  "domain": "SYNTHETIC",
+  "version": "fixture-v1",
+  "league": "laboratory",
+  "unit": "test-credit",
+  "as_of": "2026-10-20T22:27:05.197880+00:00",
+  "quotes": {
+    "power-first": "1",
+    "speed-first": "5",
+    "power-after-speed": "1",
+    "speed-after-power": "100",
+    "roll-prefix": "1",
+    "remove-prefix": "2",
+    "base": "10"
+  },
+  "evidence": {
+    "source": "Forge synthetic specification",
+    "reference": "fixtures.py:v1",
+    "retrieved_at": "2026-10-20T22:27:05.197880+00:00",
+    "status": "VERIFIED",
+    "domain": "SYNTHETIC",
+    "version": "fixture-v1",
+    "league": "laboratory",
+    "notes": "Invented rules, established by definition, never real PoE2 evidence."
+  },
+  "max_age_seconds": 86400
+}

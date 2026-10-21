@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Forge scoped evidence with explicit knowledge category",
+  "type": "object",
+  "required": ["source", "reference", "retrieved_at", "status", "domain", "version", "league", "notes"],
+  "additionalProperties": false,
+  "properties": {
+    "source": {"type": "string"}, "reference": {"type": "string"},
+    "retrieved_at": {"type": "string", "format": "date-time"},
+    "status": {"enum": ["VERIFIED", "INFERRED", "HYPOTHESIS", "UNKNOWN", "CONFLICTED"]},
+    "domain": {"enum": ["POE2", "SYNTHETIC"]},
+    "version": {"type": "string"}, "league": {"type": "string"}, "notes": {"type": "string"},
+    "category": {"enum": ["SOURCE_FACT", "VERIFIED_GAME_OBSERVATION", "SIMULATOR_OBSERVATION", "MATHEMATICAL_ASSUMPTION", "UNKNOWN", null]},
+    "supporting_fact": {"type": ["string", "null"]}
+  }
+}

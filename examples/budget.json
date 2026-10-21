@@ -1,0 +1,422 @@
+{
+  "dataset": {
+    "domain": "SYNTHETIC",
+    "version": "fixture-v1",
+    "league": "laboratory",
+    "bases": [
+      {
+        "id": "test-base",
+        "item_class": "test-class",
+        "tags": [
+          "test"
+        ],
+        "limits": {
+          "rare": {
+            "prefix": 1,
+            "suffix": 1
+          },
+          "normal": {
+            "prefix": 0,
+            "suffix": 0
+          }
+        },
+        "evidence": {
+          "source": "Forge synthetic specification",
+          "reference": "fixtures.py:v1",
+          "retrieved_at": "2026-10-20T22:27:05.197880+00:00",
+          "status": "VERIFIED",
+          "domain": "SYNTHETIC",
+          "version": "fixture-v1",
+          "league": "laboratory",
+          "notes": "Invented rules, established by definition, never real PoE2 evidence."
+        }
+      }
+    ],
+    "modifiers": [
+      {
+        "id": "power",
+        "side": "prefix",
+        "tier": 1,
+        "group": "power",
+        "ilvl": 1,
+        "weight": 1,
+        "bases": [
+          "test-base"
+        ],
+        "classes": [
+          "test-class"
+        ],
+        "tags": [
+          "test"
+        ],
+        "conflicts": [],
+        "evidence": {
+          "source": "Forge synthetic specification",
+          "reference": "fixtures.py:v1",
+          "retrieved_at": "2026-10-20T22:27:05.197880+00:00",
+          "status": "VERIFIED",
+          "domain": "SYNTHETIC",
+          "version": "fixture-v1",
+          "league": "laboratory",
+          "notes": "Invented rules, established by definition, never real PoE2 evidence."
+        }
+      },
+      {
+        "id": "junk",
+        "side": "prefix",
+        "tier": 1,
+        "group": "junk",
+        "ilvl": 1,
+        "weight": 1,
+        "bases": [
+          "test-base"
+        ],
+        "classes": [
+          "test-class"
+        ],
+        "tags": [
+          "test"
+        ],
+        "conflicts": [],
+        "evidence": {
+          "source": "Forge synthetic specification",
+          "reference": "fixtures.py:v1",
+          "retrieved_at": "2026-10-20T22:27:05.197880+00:00",
+          "status": "VERIFIED",
+          "domain": "SYNTHETIC",
+          "version": "fixture-v1",
+          "league": "laboratory",
+          "notes": "Invented rules, established by definition, never real PoE2 evidence."
+        }
+      },
+      {
+        "id": "speed",
+        "side": "suffix",
+        "tier": 1,
+        "group": "speed",
+        "ilvl": 1,
+        "weight": 1,
+        "bases": [
+          "test-base"
+        ],
+        "classes": [
+          "test-class"
+        ],
+        "tags": [
+          "test"
+        ],
+        "conflicts": [],
+        "evidence": {
+          "source": "Forge synthetic specification",
+          "reference": "fixtures.py:v1",
+          "retrieved_at": "2026-10-20T22:27:05.197880+00:00",
+          "status": "VERIFIED",
+          "domain": "SYNTHETIC",
+          "version": "fixture-v1",
+          "league": "laboratory",
+          "notes": "Invented rules, established by definition, never real PoE2 evidence."
+        }
+      }
+    ],
+    "actions": [
+      {
+        "id": "power-first",
+        "operation": "add_fixed",
+        "evidence": {
+          "source": "Forge synthetic specification",
+          "reference": "fixtures.py:v1",
+          "retrieved_at": "2026-10-20T22:27:05.197880+00:00",
+          "status": "VERIFIED",
+          "domain": "SYNTHETIC",
+          "version": "fixture-v1",
+          "league": "laboratory",
+          "notes": "Invented rules, established by definition, never real PoE2 evidence."
+        },
+        "rarities": [
+          "rare"
+        ],
+        "resources": {
+          "power-first": 1
+        },
+        "side": "prefix",
+        "pool_tags": [],
+        "fixed_mod": "power",
+        "require_mods": [],
+        "forbid_mods": [
+          "speed"
+        ],
+        "require_flags": [],
+        "forbid_flags": [],
+        "set_flags": [],
+        "clear_flags": [],
+        "resulting_rarity": null,
+        "known_flags": []
+      },
+      {
+        "id": "speed-first",
+        "operation": "add_fixed",
+        "evidence": {
+          "source": "Forge synthetic specification",
+          "reference": "fixtures.py:v1",
+          "retrieved_at": "2026-10-20T22:27:05.197880+00:00",
+          "status": "VERIFIED",
+          "domain": "SYNTHETIC",
+          "version": "fixture-v1",
+          "league": "laboratory",
+          "notes": "Invented rules, established by definition, never real PoE2 evidence."
+        },
+        "rarities": [
+          "rare"
+        ],
+        "resources": {
+          "speed-first": 1
+        },
+        "side": "suffix",
+        "pool_tags": [],
+        "fixed_mod": "speed",
+        "require_mods": [],
+        "forbid_mods": [
+          "power"
+        ],
+        "require_flags": [],
+        "forbid_flags": [],
+        "set_flags": [],
+        "clear_flags": [],
+        "resulting_rarity": null,
+        "known_flags": []
+      },
+      {
+        "id": "power-after-speed",
+        "operation": "add_fixed",
+        "evidence": {
+          "source": "Forge synthetic specification",
+          "reference": "fixtures.py:v1",
+          "retrieved_at": "2026-10-20T22:27:05.197880+00:00",
+          "status": "VERIFIED",
+          "domain": "SYNTHETIC",
+          "version": "fixture-v1",
+          "league": "laboratory",
+          "notes": "Invented rules, established by definition, never real PoE2 evidence."
+        },
+        "rarities": [
+          "rare"
+        ],
+        "resources": {
+          "power-after-speed": 1
+        },
+        "side": "prefix",
+        "pool_tags": [],
+        "fixed_mod": "power",
+        "require_mods": [
+          "speed"
+        ],
+        "forbid_mods": [],
+        "require_flags": [],
+        "forbid_flags": [],
+        "set_flags": [],
+        "clear_flags": [],
+        "resulting_rarity": null,
+        "known_flags": []
+      },
+      {
+        "id": "speed-after-power",
+        "operation": "add_fixed",
+        "evidence": {
+          "source": "Forge synthetic specification",
+          "reference": "fixtures.py:v1",
+          "retrieved_at": "2026-10-20T22:27:05.197880+00:00",
+          "status": "VERIFIED",
+          "domain": "SYNTHETIC",
+          "version": "fixture-v1",
+          "league": "laboratory",
+          "notes": "Invented rules, established by definition, never real PoE2 evidence."
+        },
+        "rarities": [
+          "rare"
+        ],
+        "resources": {
+          "speed-after-power": 1
+        },
+        "side": "suffix",
+        "pool_tags": [],
+        "fixed_mod": "speed",
+        "require_mods": [
+          "power"
+        ],
+        "forbid_mods": [],
+        "require_flags": [],
+        "forbid_flags": [],
+        "set_flags": [],
+        "clear_flags": [],
+        "resulting_rarity": null,
+        "known_flags": []
+      },
+      {
+        "id": "roll-prefix",
+        "operation": "add_pool",
+        "evidence": {
+          "source": "Forge synthetic specification",
+          "reference": "fixtures.py:v1",
+          "retrieved_at": "2026-10-20T22:27:05.197880+00:00",
+          "status": "VERIFIED",
+          "domain": "SYNTHETIC",
+          "version": "fixture-v1",
+          "league": "laboratory",
+          "notes": "Invented rules, established by definition, never real PoE2 evidence."
+        },
+        "rarities": [
+          "rare"
+        ],
+        "resources": {
+          "roll-prefix": 1
+        },
+        "side": "prefix",
+        "pool_tags": [],
+        "fixed_mod": null,
+        "require_mods": [],
+        "forbid_mods": [],
+        "require_flags": [],
+        "forbid_flags": [],
+        "set_flags": [],
+        "clear_flags": [],
+        "resulting_rarity": null,
+        "known_flags": []
+      },
+      {
+        "id": "remove-prefix",
+        "operation": "remove",
+        "evidence": {
+          "source": "Forge synthetic specification",
+          "reference": "fixtures.py:v1",
+          "retrieved_at": "2026-10-20T22:27:05.197880+00:00",
+          "status": "VERIFIED",
+          "domain": "SYNTHETIC",
+          "version": "fixture-v1",
+          "league": "laboratory",
+          "notes": "Invented rules, established by definition, never real PoE2 evidence."
+        },
+        "rarities": [
+          "rare"
+        ],
+        "resources": {
+          "remove-prefix": 1
+        },
+        "side": "prefix",
+        "pool_tags": [],
+        "fixed_mod": null,
+        "require_mods": [],
+        "forbid_mods": [],
+        "require_flags": [],
+        "forbid_flags": [],
+        "set_flags": [],
+        "clear_flags": [],
+        "resulting_rarity": null,
+        "known_flags": []
+      }
+    ],
+    "pools": [
+      {
+        "base": "test-base",
+        "action": "roll-prefix",
+        "min_ilvl": 1,
+        "max_ilvl": 100,
+        "modifier_ids": [
+          "power",
+          "junk"
+        ],
+        "evidence": {
+          "source": "Forge synthetic specification",
+          "reference": "fixtures.py:v1",
+          "retrieved_at": "2026-10-20T22:27:05.197880+00:00",
+          "status": "VERIFIED",
+          "domain": "SYNTHETIC",
+          "version": "fixture-v1",
+          "league": "laboratory",
+          "notes": "Invented rules, established by definition, never real PoE2 evidence."
+        }
+      }
+    ]
+  },
+  "prices": {
+    "domain": "SYNTHETIC",
+    "version": "fixture-v1",
+    "league": "laboratory",
+    "unit": "test-credit",
+    "as_of": "2026-10-20T22:27:05.197880+00:00",
+    "quotes": {
+      "power-first": "1",
+      "speed-first": "5",
+      "power-after-speed": "1",
+      "speed-after-power": "100",
+      "roll-prefix": "1",
+      "remove-prefix": "2",
+      "base": "10"
+    },
+    "evidence": {
+      "source": "Forge synthetic specification",
+      "reference": "fixtures.py:v1",
+      "retrieved_at": "2026-10-20T22:27:05.197880+00:00",
+      "status": "VERIFIED",
+      "domain": "SYNTHETIC",
+      "version": "fixture-v1",
+      "league": "laboratory",
+      "notes": "Invented rules, established by definition, never real PoE2 evidence."
+    },
+    "max_age_seconds": 86400
+  },
+  "options": {
+    "valuation_at": "2026-10-20T22:27:05.197880+00:00"
+  },
+  "plan": {
+    "schema_version": 1,
+    "dataset_id": "d3bfb4347fd226a09b06657a638787bf12774484884cca8d78872e2c00589e55",
+    "starting_state": {
+      "base": "test-base",
+      "ilvl": 1,
+      "rarity": "rare",
+      "quality": 0,
+      "mods": [],
+      "fractured": [],
+      "protected": [],
+      "flags": []
+    },
+    "target": [
+      "power",
+      "speed"
+    ],
+    "base_resource": "base",
+    "entry": "first",
+    "nodes": {
+      "first": {
+        "objective": "Acquire exact target without losing previous progress",
+        "action": "speed-first",
+        "branches": {
+          "speed": "roll"
+        },
+        "rung": "speed"
+      },
+      "roll": {
+        "objective": "Acquire exact target without losing previous progress",
+        "action": "roll-prefix",
+        "branches": {
+          "power": "done",
+          "junk": "recover"
+        },
+        "rung": "power"
+      },
+      "recover": {
+        "objective": "Acquire exact target without losing previous progress",
+        "action": "remove-prefix",
+        "branches": {
+          "junk": "roll"
+        },
+        "rung": "power"
+      },
+      "done": {
+        "objective": "Exact target",
+        "terminal": "success"
+      }
+    }
+  },
+  "budget": "28"
+}
