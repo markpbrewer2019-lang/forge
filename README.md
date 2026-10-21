@@ -110,7 +110,7 @@ Recovery search uses the same planner; it compares incremental spend with a supp
 
 Golden 6 is a developer grouping/gating tool. It preserves required actions and branches but is not a finished concise player-facing explanation generator. The source tree contains no consumer UI or HTTP server.
 
-See `docs/SOURCES.md` for source findings and `COMPLETION_REPORT.md` for this session's measured results and next task.
+See `docs/SOURCES.md` for source findings, `docs/KEEPER_RUN_REPORT.md` for the latest continuation results, and `NEXT_PHASE.md` for the next task. `COMPLETION_REPORT.md` preserves the earlier implementation report.
 
 ## Live market workflow
 
@@ -125,4 +125,4 @@ python -m forge currency-quote --input examples/currency-quote-request.json
 
 The client stores exact response bytes and normalized decimal strings. It enforces request intervals, server Retry-After, conditional ETag/Last-Modified refresh, no-cache revalidation and no-store restrictions. A 304 does not freshen old quote observation timestamps. Source errors return BLOCKED, never fallback prices. Refresh commands return PARTIALLY_VALIDATED (exit 2) for successfully ingested but unreviewed market observations; their JSON report distinguishes this from ingestion failure. `prices_file` can point directly to a saved refresh response for inspection or route pricing; route evidence gates remain active.
 
-The checked-in live sample contains 51 actual Currency quotes for Forbidden Rites, observed on 2026-10-20. It is historical evidence, not a perpetual current-price fixture. The as-of time is in `market-data/coverage.json`.
+The locally preserved live sample contains 51 actual Currency quotes for Forbidden Rites, observed on 2026-10-20. It is historical evidence, not a perpetual current-price fixture. Its as-of time is in local `market-data/coverage.json`; market snapshots are excluded from source control, as documented in `docs/SOURCE_CONTROL.md`.
