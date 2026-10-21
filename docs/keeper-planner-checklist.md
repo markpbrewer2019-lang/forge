@@ -19,9 +19,10 @@ User scope: resume existing Forge; do not rebuild, rediscover sources, invent me
 - [x] Legacy dataset hashes replay unchanged.
 - [x] Keeper graph audit and conditional compiler instructions verified; search remains explicitly strict-monotone. General restart/fallback search is not claimed.
 - [x] Independent read-only code review and test-backed Important fixes.
-- [x] Full suite: 96 tests passed in 29.875 seconds. Integrated seeded 20,000-trial simulation: mean 22.9649 versus exact 23, no disagreement.
+- [x] Final full suite: 99 tests passed in 33.875 seconds, including three repository-audit tests. Integrated seeded 20,000-trial simulation: mean 22.9649 versus exact 23, no disagreement.
 - [x] Verification writes a source-hash manifest and durable reports; versioned continuation checkpoint follows.
-- [ ] Only then: source-control exclusions, secret audit, private GitHub repository, verified push.
+- [x] Only then: source-control exclusions, secret audit (68 staged files, zero findings), private GitHub repository and verified upload. The remote checkpoint tree equals the local audited index tree: `f7afb03689246202600c905b777be59e88c3320b`.
+- Source checkpoint: `61f308167665039b745dddb4d6787680d5acfb76`, private repository `https://github.com/markpbrewer2019-lang/forge`, branch `main`. Final documentation closeout follows this checkpoint.
 
 ## Execution rulings
 
