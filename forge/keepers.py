@@ -49,7 +49,7 @@ class KeeperPolicy:
             if rule["role"] == "FINAL_KEEPER":
                 require(rule["modifier"] in targets, "KEEPER_TARGET_CONFLICT", rule["modifier"], "INVALID")
 
-    def lifecycle_check(self, before, after, action):
+    def lifecycle_check(self, before, after, action, removed=()):
         for rule in self.lifecycle or []:
             mid = rule["modifier"]
             if mid not in before.mods:
@@ -60,7 +60,7 @@ class KeeperPolicy:
             if active:
                 require(action.id not in rule.get("forbidden_actions", ()) and action.operation not in rule.get("forbidden_operations", ()),
                         "LIFECYCLE_FORBIDDEN_ACTION", mid, "INVALID")
-            if mid in after.mods:
+            if mid in after.mods and mid not in removed:
                 continue
             require(rule["role"] != "FINAL_KEEPER" and not (active and rule["role"] in {"ACTIVE_BLOCKER", "TEMP_SETUP"}),
                     "LIFECYCLE_PREMATURE_REMOVAL", mid, "INVALID")
@@ -72,14 +72,14 @@ class KeeperPolicy:
     def keepers(self, item, targets):
         return set(self.initial) | (set(item.mods) & set(targets) if self.lock_on_acquire else set())
 
-    def classify(self, before, after, targets, action, terminal=None):
-        self.lifecycle_check(before, after, action)
+    def classify(self, before, after, targets, action, terminal=None, removed=()):
+        self.lifecycle_check(before, after, action, removed)
         restart = action.id in self.restart_actions
         if restart:
             require(action.operation == "reset", "UNPROVEN_RESTART", action.id, "INVALID")
         keepers = self.keepers(before, targets)
-        lost = sorted(keepers - set(after.mods))
-        initial_lost = set(self.initial) - set(after.mods)
+        lost = sorted((keepers - set(after.mods)) | (keepers & set(removed)))
+        initial_lost = (set(self.initial) - set(after.mods)) | (set(self.initial) & set(removed))
         if restart:
             require(not initial_lost or self.allow_initial_loss_on_restart,
                     "INITIAL_KEEPER_LOSS", str(sorted(initial_lost)), "INVALID")

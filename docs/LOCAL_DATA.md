@@ -52,6 +52,8 @@ Final verification: **113 tests, zero failures/errors**, including 14 source-rec
 
 ## Source catalog and current recall
 
+Latest continuation: `SOURCE_ACTIONS_REPORT.md`, 158 passing tests and 33,069 matched captured rows. `catalog-action` accepts `{"record_id":"Chaos_Orb"}` for a complete-description canonical proposal and missing proof fields. It is offline and leaves evidence INFERRED. `build-craft` lists supported source variants, including exact-name Omen relationships, without player hints. Canonical `unresolved_rules` remain blocking. Currency/other display styles and reward references are now included; affirmative conflicting properties still block even when a reference lacks a description.
+
 ```text
 python tools/sync_sources.py --all-items --catalog --archive-public-pages --market-file market-data/currency.json
 python -m forge catalog-build

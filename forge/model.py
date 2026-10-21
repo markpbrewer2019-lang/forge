@@ -179,6 +179,8 @@ class Action:
     mechanic_context: dict | None = field(default=None, metadata={"omit_none": True})
     socket_delta: int | None = field(default=None, metadata={"omit_none": True})
     irreversible: bool | None = field(default=None, metadata={"omit_none": True})
+    min_mod_ilvl: int | None = field(default=None, metadata={"omit_none": True})
+    removal_rule: dict | None = field(default=None, metadata={"omit_none": True})
 
 
 @dataclass(frozen=True)
@@ -247,6 +249,14 @@ class Dataset:
             for name in ("incompatible_flags", "forbidden_actions", "forbidden_operations"):
                 sequence(getattr(rule, name), f"{fid}.{name}", True)
         for aid, a in self.actions.items():
+            require(a.min_mod_ilvl is None or (type(a.min_mod_ilvl) is int and a.min_mod_ilvl >= 1),
+                    "INVALID_MODIFIER_LEVEL_FLOOR", aid, "INVALID")
+            if a.removal_rule is not None:
+                rule = a.removal_rule
+                require(isinstance(rule, dict) and set(rule) == {'mode', 'scope', 'side', 'ties', 'evidence'}
+                        and rule['mode'] in {None, 'uniform', 'lowest_ilvl'} and rule['scope'] in {None, 'eligible'}
+                        and rule['side'] in {None, 'prefix', 'suffix'} and rule['ties'] in {None, 'uniform'}
+                        and isinstance(rule['evidence'], dict), "INVALID_REMOVAL_RULE", aid, "INVALID")
             require(a.irreversible is None or type(a.irreversible) is bool, "INVALID_COMMITMENT", aid, "INVALID")
             require(a.socket_delta is None or type(a.socket_delta) is int, "INVALID_SOCKET_DELTA", aid, "INVALID")
             require(aid == a.id and bool(aid), "INVALID_RECORD_ID", aid, "INVALID")

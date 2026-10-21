@@ -23,7 +23,7 @@ def plan_ladder(engine, start, target, prices, max_states=30, max_policies=10000
     rejected = []
     # Final requirements constrain the search before any action is selected.
     require(target_state is None or isinstance(target_state, dict), "INVALID_TARGET_STATE", str(target_state), "INVALID")
-    target_state = {"rarity": start.rarity, **(target_state or {})}
+    target_state = dict(target_state or {})
     validate_target_state(engine, start, target, target_state)
     states, options, blocked = {}, {}, []
     queue = deque([start])
@@ -41,7 +41,7 @@ def plan_ladder(engine, start, target, prices, max_states=30, max_policies=10000
                 outcomes = engine.transition(item, action_id)
                 if policy:
                     for outcome in outcomes:
-                        policy.classify(item, outcome.state, target, engine.action(action_id))
+                        policy.classify(item, outcome.state, target, engine.action(action_id), removed=outcome.removed)
             except ForgeError as exc:
                 if exc.status != "INVALID":
                     blocked.append({"state": item.key, "action": action_id, "classification": "BLOCKED_UNKNOWN", **exc.report()})

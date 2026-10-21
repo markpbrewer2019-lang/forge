@@ -20,7 +20,7 @@ COMMANDS = ("inspect-item", "eligible-mods", "validate-action", "replay-route", 
             "ingest", "normalize-ninja", "demo", "failure-tree", "recover", "store-regression", "run-regressions",
             "market-leagues", "refresh-currency", "market-coverage", "currency-quote", "budget-distribution", "analyze-settle", "adversarial-test",
             "build-craft", "audit-ladder", "compile-golden6", "data-search", "data-status", "data-import",
-            "catalog-build", "catalog-query", "catalog-audit", "catalog-rule")
+            "catalog-build", "catalog-query", "catalog-audit", "catalog-rule", "catalog-action")
 
 
 def prices_input(request):
@@ -47,6 +47,8 @@ def dispatch(command, request):
             return catalog.audit()
         if command == 'catalog-rule':
             return catalog.property_rule(request['record_id'])
+        if command == 'catalog-action':
+            return catalog.action_rule(request['record_id'])
         return catalog.resolve_craft(request)
     if command in {'data-search', 'data-status', 'data-import'}:
         from .source_store import SourceStore

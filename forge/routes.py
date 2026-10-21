@@ -33,17 +33,21 @@ def validate_target_state(engine, start, target, target_state=None):
     final = replace(start, mods=tuple(target), flags=(), fractured=(), protected=(), **{
         k: v for k, v in (target_state or {}).items() if k not in {"flags", "fractured", "protected"}})
     final = replace(final, **{k: v for k, v in (target_state or {}).items() if k in {"flags", "fractured", "protected"}})
-    try:
-        engine.inspect(final)
-    except ForgeError as exc:
-        # Unspecified final properties are search decisions. With physical rules
-        # loaded, the empty-flag prototype cannot establish final capacity:
-        # retained/acquired properties may expand it. inspect checks intrinsic
-        # modifier applicability and conflicts before capacity, and every real
-        # search/replay successor is still inspected without this exception.
-        if not (exc.code == "AFFIX_CAPACITY_EXCEEDED" and "flags" not in (target_state or {})
-                and engine.data.flag_rules):
-            raise
+    require(final.base in engine.data.bases, 'UNSUPPORTED_BASE', final.base)
+    rarities = [final.rarity] if 'rarity' in (target_state or {}) else list(engine.data.bases[final.base].limits)
+    capacity_error = None
+    for rarity in rarities:
+        try:
+            engine.inspect(replace(final, rarity=rarity))
+            return
+        except ForgeError as exc:
+            if exc.code != 'AFFIX_CAPACITY_EXCEEDED':
+                raise
+            capacity_error = exc
+    # Unspecified final rarity/properties are search decisions. This prototype
+    # only rejects intrinsic impossibility; every actual successor is inspected.
+    if capacity_error is not None and not ('flags' not in (target_state or {}) and engine.data.flag_rules):
+        raise capacity_error
 
 
 def replay(engine, plan, max_states=1000):
@@ -64,7 +68,9 @@ def replay(engine, plan, max_states=1000):
     for mid in target:
         engine.modifier(mid)
     # Reject an intrinsically impossible final item before exploring its route.
-    target_state = {"rarity": plan.get("target_rarity", start.rarity), **plan.get("target_state", {})}
+    target_state = plan.get('target_state', {})
+    require(isinstance(target_state, dict), 'INVALID_TARGET_STATE', str(target_state), 'INVALID')
+    target_state = {**({'rarity': plan['target_rarity']} if 'target_rarity' in plan else {}), **target_state}
     require("target_rarity" not in plan or target_state["rarity"] == plan["target_rarity"],
             "CONFLICTING_TARGET_RARITY", str(target_state), "INVALID")
     validate_target_state(engine, start, target, target_state)
@@ -98,7 +104,7 @@ def replay(engine, plan, max_states=1000):
                 require(terminal in {"success", "failure", "settle"}, "INVALID_TERMINAL", terminal, "INVALID")
                 if terminal == "success":
                     require(target_matches(item, target, target_state), "FINAL_TARGET_MISMATCH", node_id, "INVALID")
-                    require(item.rarity == target_state["rarity"], "FINAL_RARITY_MISMATCH", node_id, "INVALID")
+                    require('rarity' not in target_state or item.rarity == target_state['rarity'], "FINAL_RARITY_MISMATCH", node_id, "INVALID")
                 if terminal == "settle":
                     require(bool(node.get("settle_reason")), "UNJUSTIFIED_SETTLE", node_id, "INVALID")
                     if policy:
@@ -123,9 +129,10 @@ def replay(engine, plan, max_states=1000):
                 classification, keeper_loss = (None, [])
                 if policy:
                     classification, keeper_loss = policy.classify(item, outcome.state, target, engine.action(node["action"]),
-                                                                 nodes.get(next_id, {}).get("terminal"))
+                                                                 nodes.get(next_id, {}).get("terminal"), removed=outcome.removed)
                 edges[key].append((outcome.probability, dest, outcome.label))
                 trace.append({"node": node_id, "rung": node.get("rung"), "action": node["action"],
+                              **({'removed_during_action': list(outcome.removed)} if outcome.removed else {}),
                               "before": item.key, "after": outcome.state.key, "label": outcome.label,
                               "probability": outcome.probability, "next": next_id,
                               "classification": classification, "keeper_loss": keeper_loss,

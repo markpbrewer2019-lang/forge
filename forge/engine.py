@@ -1,5 +1,6 @@
 from dataclasses import dataclass, replace
 from fractions import Fraction
+import json
 
 from .model import ForgeError, Item, require, jsonable, rational
 
@@ -9,6 +10,7 @@ class Outcome:
     label: str
     probability: Fraction
     state: Item
+    removed: tuple[str, ...] = ()
 
 
 class Engine:
@@ -87,10 +89,12 @@ class Engine:
         require(action_id in self.data.actions, "UNVERIFIED_MECHANIC", action_id)
         action = self.data.actions[action_id]
         action.evidence.verify_mechanic(self.data.domain, self.data.version, self.data.league)
-        require(action.operation in {"add_pool", "add_fixed", "remove", "remove_fixed", "reset", "flags"},
+        require(action.operation in {"add_pool", "add_fixed", "remove", "remove_fixed", "remove_add", "reset", "flags"},
                 "UNSUPPORTED_MECHANIC", action.operation)
         if action.mechanic_context:
             context = action.mechanic_context
+            require(not context.get('unresolved_rules'), 'UNRESOLVED_SOURCE_RULE',
+                    {'action': action.id, 'rules': context.get('unresolved_rules')})
             require(not context.get("special_pool"), "UNSUPPORTED_SPECIAL_POOL", str(context.get("special_pool")))
             if context.get("omens") or context.get("essence"):
                 from .model import Evidence
@@ -109,20 +113,29 @@ class Engine:
         if self.data.flag_rules is not None:
             evidence["physical_properties"] = {flag: self.flag_rule(flag).evidence.provenance()
                 for flag in sorted(set(item.flags) | set(action.set_flags))}
-        if action.operation == "add_pool":
-            pool = self.pool(item, action_id)
+        if action.operation in {"add_pool", "remove_add"}:
+            contexts = [item] if action.operation == 'add_pool' else [
+                replace(item, mods=tuple(m for m in item.mods if m != victim))
+                for victim, _ in self.removal_distribution(item, action)]
+            pools = [self.pool(state, action_id) for state in contexts]
             certificate = next(p for p in self.data.pools if p.base == item.base and p.action == action_id
                                and p.min_ilvl <= item.ilvl <= p.max_ilvl)
             evidence["pool_completeness"] = certificate.evidence.provenance()
             evidence["eligible_modifiers"] = {m["modifier"]: self.modifier(m["modifier"]).evidence.provenance()
-                                               for m in pool["eligible"]}
+                                               for pool in pools for m in pool["eligible"]}
+            if action.operation == 'remove_add':
+                evidence['removal_rule'] = action.removal_rule
+                evidence['atomic_sequence'] = 'Remove selected victim, then sample the certified pool from that intermediate state; no intervening player decision.'
             evidence["probability_rule"] = {"category": "MATHEMATICAL_ASSUMPTION",
                 "supporting_fact": "Normalize the verified eligible source weights; this arithmetic does not establish the mechanic."}
         elif action.operation == "add_fixed":
             evidence["added_modifier"] = self.modifier(action.fixed_mod).evidence.provenance()
         elif action.operation in {"remove", "remove_fixed"}:
             evidence["probability_rule"] = {"category": "MATHEMATICAL_ASSUMPTION",
-                "supporting_fact": "Selection follows the declared uniform or exact-victim removal rule; mechanic evidence must establish applicability."}
+                "supporting_fact": ("Normalize the declared " + action.removal_rule['mode'] + " selector and explicit tie rule; its evidence establishes applicability.")
+                    if action.removal_rule else "Selection follows the declared uniform or exact-victim removal rule; mechanic evidence must establish applicability."}
+        if action.removal_rule is not None:
+            evidence['removal_rule'] = action.removal_rule
         if action.mechanic_context and action.mechanic_context.get("interaction_evidence"):
             from .model import Evidence
             evidence["interaction"] = Evidence(**action.mechanic_context["interaction_evidence"]).provenance()
@@ -133,6 +146,8 @@ class Engine:
         reasons = []
         if item.ilvl < m.ilvl:
             reasons.append("MODIFIER_ILVL_REQUIREMENT_NOT_MET")
+        if action.min_mod_ilvl is not None and m.ilvl < action.min_mod_ilvl:
+            reasons.append('BELOW_ACTION_MODIFIER_LEVEL_FLOOR')
         if item.base not in m.bases or base.item_class not in m.classes:
             reasons.append("BASE_OR_CLASS_RESTRICTION")
         if action.side and m.side != action.side:
@@ -152,7 +167,10 @@ class Engine:
     def pool(self, item, action_id):
         self.inspect(item)
         action = self.action(action_id)
-        require(action.operation == "add_pool", "NOT_POOL_ACTION", action_id, "INVALID")
+        require(action.operation in {"add_pool", "remove_add"}, "NOT_POOL_ACTION", action_id, "INVALID")
+        if action.resulting_rarity:
+            item = replace(item, rarity=action.resulting_rarity)
+            self.inspect(item)
         certificates = [p for p in self.data.pools if p.base == item.base and p.action == action_id
                         and p.min_ilvl <= item.ilvl <= p.max_ilvl]
         require(len(certificates) == 1, "INSUFFICIENT_VERIFIED_DATA",
@@ -201,25 +219,53 @@ class Engine:
                 and set(action.require_flags) <= set(item.flags) and not set(action.forbid_flags) & set(item.flags),
                 "ACTION_REQUIREMENT_NOT_SATISFIED", action_id, "INVALID")
         if action.operation in {"add_fixed", "add_pool"} and action.side:
-            require(info["open_slots"][action.side] > 0, "NO_OPEN_" + action.side.upper(), action_id, "INVALID")
+            addition_info = self.inspect(replace(item, rarity=action.resulting_rarity)) if action.resulting_rarity else info
+            require(addition_info["open_slots"][action.side] > 0, "NO_OPEN_" + action.side.upper(), action_id, "INVALID")
         if action.operation == "add_fixed":
             m = self.modifier(action.fixed_mod)
-            reasons = self.excluded(item, action, m)
+            reasons = self.excluded(replace(item, rarity=action.resulting_rarity) if action.resulting_rarity else item, action, m)
             require(not reasons, reasons[0] if reasons else "", str(reasons), "INVALID")
         if action.operation in {"remove", "remove_fixed"}:
             if action.operation == "remove_fixed":
                 require(bool(action.fixed_mod), "MISSING_DETERMINISTIC_VICTIM", action_id, "INVALID")
-            require(bool(self.removable(item, action)), "NO_ELIGIBLE_REMOVAL", action_id, "INVALID")
+            require(bool(self.removal_distribution(item, action) if action.removal_rule is not None else self.removable(item, action)),
+                    "NO_ELIGIBLE_REMOVAL", action_id, "INVALID")
         if action.operation == "reset":
             require(not item.fractured and not item.protected, "UNKNOWN_INTERACTION", "Reset with protections unsupported")
         if action.operation == "add_pool":
             require(self.pool(item, action_id)["total_weight"] > 0, "EMPTY_POOL", action_id, "INVALID")
+        if action.operation == 'remove_add':
+            self.compound_branches(item, action)
         return {"status": "VALIDATED", "action": action_id, "state_id": item.key}
 
     def removable(self, item, action):
         return [mid for mid in item.mods if mid not in item.fractured and mid not in item.protected
                 and (action.operation != "remove_fixed" or mid == action.fixed_mod)
                 and (action.side is None or self.modifier(mid).side == action.side)]
+
+    def removal_distribution(self, item, action):
+        from .model import Evidence
+        rule = action.removal_rule
+        require(rule is not None and rule['mode'] is not None and rule['scope'] == 'eligible',
+                'UNKNOWN_REMOVAL_RULE', action.id)
+        Evidence(**rule['evidence']).verify_mechanic(self.data.domain, self.data.version, self.data.league)
+        candidates = self.removable(item, replace(action, side=rule['side']))
+        require(bool(candidates), 'NO_ELIGIBLE_REMOVAL', action.id, 'INVALID')
+        if rule['mode'] == 'lowest_ilvl':
+            level = min(self.modifier(mid).ilvl for mid in candidates)
+            candidates = [mid for mid in candidates if self.modifier(mid).ilvl == level]
+            require(len(candidates) == 1 or rule['ties'] == 'uniform', 'UNKNOWN_REMOVAL_TIE_RULE', action.id)
+        return [(mid, Fraction(1, len(candidates))) for mid in candidates]
+
+    def compound_branches(self, item, action):
+        branches = []
+        for victim, probability in self.removal_distribution(item, action):
+            intermediate = replace(item, mods=tuple(m for m in item.mods if m != victim))
+            self.inspect(intermediate)
+            pool = self.pool(intermediate, action.id)
+            require(pool['total_weight'] > 0, 'EMPTY_COMPOUND_BRANCH', {'action': action.id, 'victim': victim}, 'INVALID')
+            branches.append((victim, probability, intermediate, pool))
+        return branches
 
     def transition(self, item, action_id):
         self.legality(item, action_id)
@@ -229,7 +275,13 @@ class Engine:
         if a.socket_delta is not None:
             common["sockets"] = item.sockets + a.socket_delta
         outcomes = []
-        if a.operation == "add_pool":
+        if a.operation == 'remove_add':
+            for victim, probability, intermediate, pool in self.compound_branches(item, a):
+                for m in pool['eligible']:
+                    label = json.dumps([victim, m['modifier']], separators=(',', ':'))
+                    outcomes.append(Outcome(label, probability * Fraction(m['weight'], pool['total_weight']),
+                        replace(intermediate, mods=intermediate.mods + (m['modifier'],), **common), (victim,)))
+        elif a.operation == "add_pool":
             pool = self.pool(item, action_id)
             for m in pool["eligible"]:
                 outcomes.append(Outcome(m["modifier"], Fraction(m["weight"], pool["total_weight"]),
@@ -237,9 +289,10 @@ class Engine:
         elif a.operation == "add_fixed":
             outcomes.append(Outcome(a.fixed_mod, Fraction(1), replace(item, mods=item.mods + (a.fixed_mod,), **common)))
         elif a.operation in {"remove", "remove_fixed"}:
-            removable = self.removable(item, a)
-            for mid in removable:
-                outcomes.append(Outcome(mid, Fraction(1, len(removable)),
+            distribution = self.removal_distribution(item, a) if a.removal_rule is not None else [
+                (mid, Fraction(1, len(self.removable(item, a)))) for mid in self.removable(item, a)]
+            for mid, probability in distribution:
+                outcomes.append(Outcome(mid, probability,
                                         replace(item, mods=tuple(m for m in item.mods if m != mid), **common)))
         elif a.operation == "reset":
             outcomes.append(Outcome("reset", Fraction(1), replace(item, mods=(), **common)))

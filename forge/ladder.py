@@ -35,7 +35,8 @@ def audit_ladder(engine, plan, prices, valuation_at=None):
         destination = (row["next"], row["after"])
         before, after = result.states[key], result.states[destination]
         action = engine.action(row["action"])
-        classification, lost = policy.classify(before, after, target, action, result.terminals.get(destination))
+        classification, lost = policy.classify(before, after, target, action, result.terminals.get(destination),
+                                              removed=row.get('removed_during_action', ()))
         inspection = engine.inspect(before)
         keepers = policy.keepers(before, target) & set(before.mods)
         lifecycle = {r["modifier"]: r for r in policy.lifecycle or [] if r["modifier"] in before.mods}
@@ -54,10 +55,13 @@ def audit_ladder(engine, plan, prices, valuation_at=None):
             "recovery_transition": row["next"] if classification != "ADVANCE" else None,
             "restart_condition": classification == "RESTART"})
     restart_probability = event_probability(result, lambda key, dest, label: result.actions[key] in policy.restart_actions)
+    removed_events = {(r['node'], r['before'], r['label']): set(r.get('removed_during_action', ())) for r in result.trace}
     keeper_loss_probability = event_probability(result, lambda key, dest, label:
-        bool(policy.keepers(result.states[key], target) - set(result.states[dest].mods)))
+        bool((policy.keepers(result.states[key], target) - set(result.states[dest].mods))
+             | (policy.keepers(result.states[key], target) & removed_events.get((*key, label), set()))))
     initial_keeper_loss_probability = event_probability(result, lambda key, dest, label:
-        bool(set(policy.initial) - set(result.states[dest].mods)))
+        bool((set(policy.initial) - set(result.states[dest].mods))
+             | (set(policy.initial) & removed_events.get((*key, label), set()))))
     return {"status": "VALIDATED", "domain": engine.data.domain, "fingerprint": result.fingerprint,
             "transitions": transitions, "economics": economics,
             "risks": {"keeper_loss_probability": keeper_loss_probability,

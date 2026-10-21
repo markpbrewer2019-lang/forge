@@ -1,0 +1,13 @@
+{
+  "checkpoint": "source-actions-v1",
+  "date": "2026-10-21",
+  "parent_commit": "0fd1c91a3366a3eb52795495e18a6cd8af30fa62",
+  "tests": {"passed": 158, "failures": 0, "errors": 0},
+  "synthetic_proof": {"exact_ev": "23", "trials": 20000, "simulation_mean": "22.9649", "keeper_loss_probability": "0", "atomic_retry_ev": "6"},
+  "captured_source_audit": {"available": 33069, "matched": 33069, "missing": 0, "mismatched": 0, "extra": 0, "coverage_percent": "100", "modifier_occurrences": 26575, "base_card_and_reference_occurrences": 6494, "distinct_source_base_ids": 2494, "saved_inventory_urls": 121, "inventory_urls": 122},
+  "source_grammar": {"source_item_ids": 308, "recognized_action_shapes": 16, "composed_variants": 1, "recognized_omen_relations": 1, "source_property_conflicts": 13, "automatically_verified_real_actions": 0},
+  "blind_real_craft_ready": false,
+  "report": "docs/SOURCE_ACTIONS_REPORT.md",
+  "persistent_library": "local-data/sources",
+  "next": "Review scoped action/pool/physical/conditional-weight facts; map resources to current matching ninja API IDs; extend unsupported mechanics, numeric rolls and inferred lifecycle/recovery planning; prove an unfamiliar craft."
+}

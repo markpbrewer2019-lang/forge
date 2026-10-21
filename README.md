@@ -104,6 +104,8 @@ All real currency market data must originate exclusively from the **poe.ninja Po
 
 ## Bounds and unfinished work
 
+Latest continuation and exact captured-source coverage: `docs/SOURCE_ACTIONS_REPORT.md`. Canonical operations now include atomic remove/add, explicit removal selectors, modifier-level floors and rarity upgrades. Recognized source proposals remain unverified and blocked; real autonomous crafting is unfinished.
+
 The planner is exponential and deliberately bounded (30 states, 10,000 policies by default). It optimizes almost-sure completion and mean spend within the loaded finite action universe. Route comparison additionally enforces exact budget-completion constraints when given `budget` and optional `min_budget_completion` (default 1). Exact cost distributions have explicit lattice/work bounds and fail closed on overflow. Settle analysis uses supplied modifier requirements and validated continuation costs; it cannot invent build usefulness or market resale value.
 
 The state/action vocabulary currently supports single fixed/pool additions, uniform eligible removal, reset, and declared flag/rarity changes. It cannot represent arbitrary multi-mod generation, stat-value rolls, conditional spawn-weight tables, complex targeting, nonlinear interactions, consumable inventory constraints or real currency semantics without extensions and evidence. Reset with fractures/protections is blocked. No real fracture/lock creation mechanic exists.

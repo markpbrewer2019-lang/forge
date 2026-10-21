@@ -14,7 +14,7 @@ from urllib.parse import urljoin, urlsplit
 from .model import require, ForgeError
 from .source_store import SourceStore, extract_poe2db, plain, validate_poe2db_url
 
-CATALOG_VERSION = 'poe2db-reference-v3'
+CATALOG_VERSION = 'poe2db-reference-v4'
 
 
 class Node:
@@ -96,7 +96,7 @@ def base_cards(raw, source_url):
     text = raw.decode('utf-8')
     tree, seen, records = Tree(text), set(), []
     for link in tree.root.walk():
-        if link.tag != 'a' or not link.has('whiteitem') or not link.text().strip():
+        if link.tag != 'a' or not link.text().strip():
             continue
         if '/Poe_Data_BaseItemTypes_hover/' not in link.attrs.get('data-hover', ''):
             continue
@@ -132,9 +132,10 @@ def base_cards(raw, source_url):
         requirement_text = ' '.join(requirements)
         level = re.search(r'\bLevel\s+(\d+)\b', requirement_text)
         attributes = {name: int(value) for value, name in re.findall(r'\b(\d+)\s+(Str|Dex|Int)\b', requirement_text)}
-        classes = [c for c in link.attrs.get('class', '').split() if c != 'whiteitem']
+        classes = link.attrs.get('class', '').split()
         records.append({'kind': 'base', 'id': urlsplit(url).path.rsplit('/', 1)[-1], 'url': url,
-            'name': ' '.join(link.text().split()), 'item_class': classes[0] if classes else None,
+            'name': ' '.join(link.text().split()), 'item_class': classes[1] if len(classes) == 2 else None,
+            'source_display_classes': classes,
             'required_character_level': int(level.group(1)) if level else None,
             'minimum_drop_item_level': None, 'attribute_requirements': attributes,
             'stats': stats, 'properties': properties, 'implicit_modifiers': implicit,
@@ -264,7 +265,7 @@ def raw_inventory(raw):
             headers = {' '.join(c.text().split()) for c in rows[0].children if isinstance(c, Node) and c.tag == 'th'}
             if 'Description' in headers and headers & {'Level', 'Pre/Suf', 'Domain'}:
                 counts['modifier'] += len(rows) - 1
-        if node.tag == 'a' and node.has('whiteitem') and node.text().strip() and '/Poe_Data_BaseItemTypes_hover/' in node.attrs.get('data-hover', ''):
+        if node.tag == 'a' and node.text().strip() and '/Poe_Data_BaseItemTypes_hover/' in node.attrs.get('data-hover', ''):
             parent = node.parent
             while parent:
                 if {'d-flex', 'border-top', 'rounded'} <= set(parent.attrs.get('class', '').split()):
@@ -425,7 +426,64 @@ class Catalog:
             {'code': 'VERIFIED_GAME_VERSION', 'detail': 'The local source inventory is not yet mapped to a reviewed game version.'},
             {'code': 'CURRENT_SELECTED_LEAGUE_PRICES', 'detail': 'Real recommendations require current matching poe.ninja API quotes; historical observations cannot authorize spend.'}])
         return {'status': 'BLOCKED', 'phase': 'SOURCE_TO_PLANNER', 'bases': bases, 'targets': targets,
+                'source_grammar': self.action_inventory(),
                 'blockers': blockers, 'golden6': None, 'note': 'References resolved offline. No currency action is recommended without full proof.'}
+
+    def action_rule(self, record_id):
+        from .grammar import action_proposal
+        records = self.query(kind='base', record_id=record_id, limit=1000)['records']
+        require(bool(records), 'BASE_NOT_FOUND', record_id)
+        require(len(records) < 1000, 'SOURCE_REFERENCE_LIMIT', record_id)
+        for field in ('name', 'item_class'):
+            require(len({r[field] for r in records if r[field]}) <= 1, 'CONFLICTING_SOURCE_PROPERTIES', f'{record_id}.{field}')
+        properties, observed = set(), {}
+        for record in records:
+            for value in record['properties']:
+                key, separator, content = value.partition(':')
+                observed.setdefault(key, set()).add(content.strip() if separator else value)
+                properties.add(value)
+        require(all(len(values) == 1 for values in observed.values()), 'CONFLICTING_SOURCE_PROPERTIES', record_id)
+        described = [r for r in records if r['explicit_modifiers'] or r['implicit_modifiers'] or r['enchantments']]
+        references = [r for r in records if r not in described]
+        # A reward-list link supplies no description; absence there is not an
+        # assertion that the fully described item's effects do not exist.
+        records = described or records
+        signatures = {packed([r['implicit_modifiers'], r['explicit_modifiers'], r['enchantments']]) for r in records}
+        require(len(signatures) == 1, 'CONFLICTING_SOURCE_PROPERTIES', record_id)
+        complete = [r for r in records if set(r['properties']) == properties]
+        require(bool(complete), 'SOURCE_PROPERTIES_REQUIRE_REVIEW', record_id)
+        records = complete
+        document = next(d for d in self.documents() if d['url'] == records[0]['source_url'])
+        return {**action_proposal(records[0], document), 'descriptionless_references': [
+            {'url': r['source_url'], 'sha256': r['snapshot_sha256']} for r in references]}
+
+    def action_inventory(self):
+        from .grammar import compose_omen
+        # query performs the saved-source/version staleness gate. Collect every ID
+        # directly instead of silently truncating a paginated source inventory.
+        self.query(kind='base', limit=1)
+        with closing(self.sources._connect()) as db:
+            ids = [r[0] for r in db.execute("SELECT DISTINCT record_id FROM catalog_rows WHERE kind='base' AND item_class IN ('StackableCurrency','Omen') ORDER BY record_id")]
+        proposals, conflicts = [], []
+        for rid in ids:
+            try:
+                proposals.append(self.action_rule(rid))
+            except ForgeError as exc:
+                if exc.code not in {'CONFLICTING_SOURCE_PROPERTIES', 'SOURCE_PROPERTIES_REQUIRE_REVIEW'}:
+                    raise
+                conflicts.append({'id': rid, 'code': exc.code})
+        interactions = [p for p in proposals if p['interaction'] is not None]
+        actions = [p for p in proposals if p['action'] is not None]
+        variants = list(actions)
+        for action in actions:
+            for omen in interactions:
+                if action['action']['operation'] == 'remove_add' and omen['interaction']['applies_to_name'] == action['source_name']:
+                    variants.append(compose_omen(action, omen))
+        return {'status': 'BLOCKED', 'scope': 'StackableCurrency and Omen source cards; no automatic verification.',
+            'source_items': len(ids), 'recognized_action_variants': len(variants), 'recognized_interactions': len(interactions),
+            'unrecognized_items': [p['source_id'] for p in proposals if not p['recognized']], 'conflicts': conflicts,
+            'candidates': [{'id': p['source_id'], 'operation': p['action']['operation'],
+                            'unresolved_fields': p['unresolved_fields']} for p in variants]}
 
     def property_rule(self, record_id):
         """Expose a reviewable physical-rule candidate, never a certified rule.
