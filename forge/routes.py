@@ -18,16 +18,39 @@ class Replay:
     fingerprint: str
 
 
-def target_matches(item, target):
+def target_matches(item, target, target_state=None):
     # Exact targets are modifier IDs (tiers belong to immutable modifier records).
-    return set(item.mods) == set(target)
+    return set(item.mods) == set(target) and all(
+        getattr(item, name) == (tuple(sorted(value)) if name in {"flags", "fractured", "protected"} else value)
+        for name, value in (target_state or {}).items())
+
+
+def validate_target_state(engine, start, target, target_state=None):
+    from dataclasses import replace
+    require(isinstance(target_state or {}, dict) and set(target_state or {}) <=
+            {"base", "ilvl", "rarity", "quality", "flags", "fractured", "protected", "sockets"},
+            "INVALID_TARGET_STATE", str(target_state), "INVALID")
+    final = replace(start, mods=tuple(target), flags=(), fractured=(), protected=(), **{
+        k: v for k, v in (target_state or {}).items() if k not in {"flags", "fractured", "protected"}})
+    final = replace(final, **{k: v for k, v in (target_state or {}).items() if k in {"flags", "fractured", "protected"}})
+    try:
+        engine.inspect(final)
+    except ForgeError as exc:
+        # Unspecified final properties are search decisions. With physical rules
+        # loaded, the empty-flag prototype cannot establish final capacity:
+        # retained/acquired properties may expand it. inspect checks intrinsic
+        # modifier applicability and conflicts before capacity, and every real
+        # search/replay successor is still inspected without this exception.
+        if not (exc.code == "AFFIX_CAPACITY_EXCEEDED" and "flags" not in (target_state or {})
+                and engine.data.flag_rules):
+            raise
 
 
 def replay(engine, plan, max_states=1000):
     require(plan.get("schema_version") == 1, "UNSUPPORTED_PLAN_SCHEMA", "Expected schema_version=1", "INVALID")
     require(set(plan) <= {"schema_version", "dataset_id", "starting_state", "target", "target_rarity",
                         "entry", "nodes", "base_resource", "base_owned", "claimed_total_cost", "keeper_policy",
-                        "acceptable_settles"},
+                        "acceptable_settles", "target_state"},
             "UNKNOWN_PLAN_FIELD", str(sorted(set(plan))), "INVALID")
     require(plan.get("dataset_id") == engine.data.key, "DATASET_MISMATCH", "Plan must pin the complete dataset hash")
     start = Item.load(plan["starting_state"])
@@ -41,8 +64,10 @@ def replay(engine, plan, max_states=1000):
     for mid in target:
         engine.modifier(mid)
     # Reject an intrinsically impossible final item before exploring its route.
-    engine.inspect(Item(start.base, start.ilvl, plan.get("target_rarity", start.rarity),
-                        start.quality, tuple(target)))
+    target_state = {"rarity": plan.get("target_rarity", start.rarity), **plan.get("target_state", {})}
+    require("target_rarity" not in plan or target_state["rarity"] == plan["target_rarity"],
+            "CONFLICTING_TARGET_RARITY", str(target_state), "INVALID")
+    validate_target_state(engine, start, target, target_state)
     nodes = plan["nodes"]
     require(plan["entry"] in nodes, "MISSING_NODE", plan["entry"], "INVALID")
     initial = (plan["entry"], start.key)
@@ -72,8 +97,8 @@ def replay(engine, plan, max_states=1000):
                 terminal = node["terminal"]
                 require(terminal in {"success", "failure", "settle"}, "INVALID_TERMINAL", terminal, "INVALID")
                 if terminal == "success":
-                    require(target_matches(item, target), "FINAL_TARGET_MISMATCH", node_id, "INVALID")
-                    require(item.rarity == plan.get("target_rarity", start.rarity), "FINAL_RARITY_MISMATCH", node_id, "INVALID")
+                    require(target_matches(item, target, target_state), "FINAL_TARGET_MISMATCH", node_id, "INVALID")
+                    require(item.rarity == target_state["rarity"], "FINAL_RARITY_MISMATCH", node_id, "INVALID")
                 if terminal == "settle":
                     require(bool(node.get("settle_reason")), "UNJUSTIFIED_SETTLE", node_id, "INVALID")
                     if policy:
@@ -121,6 +146,26 @@ def replay(engine, plan, max_states=1000):
         can_finish = expanded
     require(set(states) <= can_finish, "NONTERMINATING_RECOVERY", "Reachable closed cycle has no terminal", "INVALID")
     require(any(t == "success" for t in terminals.values()), "NO_SUCCESS_PATH", "Target never reached", "INVALID")
+    # In a finite replay graph, almost-sure success means no reachable failure/settle
+    # or closed recurrent component. Audit the entire suffix of every commitment.
+    successful = {k for k, terminal in terminals.items() if terminal == "success"}
+    can_succeed = set(successful)
+    while True:
+        expanded = can_succeed | {k for k, outgoing in edges.items() if any(d in can_succeed for _, d, _ in outgoing)}
+        if expanded == can_succeed:
+            break
+        can_succeed = expanded
+    unsafe = set(states) - can_succeed
+    unsafe |= {k for k, terminal in terminals.items() if terminal != "success"}
+    while True:
+        expanded = unsafe | {k for k, outgoing in edges.items() if any(d in unsafe for _, d, _ in outgoing)}
+        if expanded == unsafe:
+            break
+        unsafe = expanded
+    for key, outgoing in edges.items():
+        for _, dest, _ in outgoing:
+            if engine.is_commitment(states[key], states[dest], actions[key]):
+                require(dest not in unsafe, "UNPROVEN_COMMITMENT_SUFFIX", {"node": key[0], "destination": dest[0]}, "INVALID")
     if policy and not policy.lock_on_acquire:
         # Bound regression from the highest earned rung along any reachable history, not just one edge.
         peaks = {initial: len(set(start.mods) & set(target))}

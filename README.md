@@ -112,7 +112,7 @@ Recovery search uses the same planner; it compares incremental spend with a supp
 
 Golden 6 is a developer grouping/gating tool. It preserves required actions and branches but is not a finished concise player-facing explanation generator. The source tree contains no consumer UI or HTTP server.
 
-See `docs/SOURCES.md` for source findings, `docs/KEEPER_RUN_REPORT.md` for the latest continuation results, and `NEXT_PHASE.md` for the next task. `COMPLETION_REPORT.md` preserves the earlier implementation report.
+See `docs/SOURCE_PLANNER_REPORT.md` for the current continuation, its exact captured-source coverage and real-game blockers; `docs/LOCAL_DATA.md` explains offline lookup. `docs/SOURCES.md` and `docs/KEEPER_RUN_REPORT.md` preserve earlier findings. `NEXT_PHASE.md` identifies remaining work; the real unfamiliar-craft solver is not complete.
 
 ## Live market workflow
 

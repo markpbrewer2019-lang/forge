@@ -28,7 +28,7 @@ def exact_targets(engine, specifications, require_six=True):
 def build_craft(engine, start, target, prices, keeper_policy=None, acceptable_settles=None,
                 selected_league=None, budget=None, min_completion="1", min_budget_completion="1",
                 base_resource=None, base_owned=False, max_states=256, max_iterations=100,
-                valuation_at=None, require_six=True, simulation_trials=0, seed=0):
+                valuation_at=None, require_six=True, simulation_trials=0, seed=0, target_state=None):
     targets = exact_targets(engine, target, require_six)
     constraints = keeper_policy if keeper_policy is not None else {"initial": [], "lock_on_acquire": True}
     settles = acceptable_settles or []
@@ -47,7 +47,7 @@ def build_craft(engine, start, target, prices, keeper_policy=None, acceptable_se
                 "CURRENT_PRICES_REQUIRED", "Refresh the selected league: price observation must be within one hour")
     search = plan_ladder(engine, start, targets, prices, max_states=max_states, base_resource=base_resource,
                          base_owned=base_owned, valuation_at=valuation_at, keeper_policy=constraints,
-                         optimizer="policy_iteration", max_iterations=max_iterations, acceptable_settles=settles)
+                         optimizer="policy_iteration", max_iterations=max_iterations, acceptable_settles=settles, target_state=target_state)
     if search["status"] != "VALIDATED":
         return {"status": search["status"], "phase": "PLANNING", "search": search, "golden6": None}
     plans = {"candidate-" + str(i + 1): c["plan"] for i, c in enumerate(search["candidates"])}

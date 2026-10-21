@@ -132,8 +132,11 @@ class Item:
     fractured: tuple[str, ...] = ()
     protected: tuple[str, ...] = ()
     flags: tuple[str, ...] = ()
+    sockets: int | None = field(default=None, metadata={"omit_none": True})
 
     def __post_init__(self):
+        require(self.sockets is None or (type(self.sockets) is int and self.sockets >= 0),
+                "INVALID_SOCKET_STATE", str(self.sockets), "INVALID")
         for name in ("mods", "fractured", "protected", "flags"):
             require(isinstance(getattr(self, name), (tuple, list))
                     and all(isinstance(v, str) and v for v in getattr(self, name)),
@@ -174,6 +177,21 @@ class Action:
     known_flags: tuple[str, ...] = ()
     display_name: str | None = field(default=None, metadata={"omit_none": True})
     mechanic_context: dict | None = field(default=None, metadata={"omit_none": True})
+    socket_delta: int | None = field(default=None, metadata={"omit_none": True})
+    irreversible: bool | None = field(default=None, metadata={"omit_none": True})
+
+
+@dataclass(frozen=True)
+class FlagRule:
+    """Explicit evidenced physical semantics; absent fields remain unknown."""
+    id: str
+    evidence: Evidence
+    permanent: bool | None = None
+    capacity_delta: dict | None = None
+    incompatible_flags: tuple[str, ...] | None = None
+    forbidden_actions: tuple[str, ...] | None = None
+    forbidden_operations: tuple[str, ...] | None = None
+    occupied_sockets: int | None = None
 
 
 @dataclass(frozen=True)
@@ -195,6 +213,7 @@ class Dataset:
     modifiers: dict[str, Modifier]
     actions: dict[str, Action]
     pools: tuple[PoolCertificate, ...]
+    flag_rules: dict[str, FlagRule] | None = field(default=None, metadata={"omit_none": True})
 
     def __post_init__(self):
         require(self.domain in {"SYNTHETIC", "POE2"}, "WRONG_GAME", self.domain, "INVALID")
@@ -217,7 +236,19 @@ class Dataset:
                         "INVALID_MODIFIER_NUMBER", f"{mid}.{name}", "INVALID")
             for name in ("bases", "classes", "tags", "conflicts"):
                 sequence(getattr(m, name), f"{mid}.{name}", True)
+        for fid, rule in (self.flag_rules or {}).items():
+            require(fid == rule.id and bool(fid), "INVALID_RECORD_ID", fid, "INVALID")
+            require(rule.permanent is None or type(rule.permanent) is bool, "INVALID_FLAG_RULE", fid, "INVALID")
+            require(rule.occupied_sockets is None or (type(rule.occupied_sockets) is int and rule.occupied_sockets >= 0),
+                    "INVALID_FLAG_RULE", fid, "INVALID")
+            if rule.capacity_delta is not None:
+                require(set(rule.capacity_delta) <= {"prefix", "suffix"} and all(type(v) is int for v in rule.capacity_delta.values()),
+                        "INVALID_FLAG_RULE", fid, "INVALID")
+            for name in ("incompatible_flags", "forbidden_actions", "forbidden_operations"):
+                sequence(getattr(rule, name), f"{fid}.{name}", True)
         for aid, a in self.actions.items():
+            require(a.irreversible is None or type(a.irreversible) is bool, "INVALID_COMMITMENT", aid, "INVALID")
+            require(a.socket_delta is None or type(a.socket_delta) is int, "INVALID_SOCKET_DELTA", aid, "INVALID")
             require(aid == a.id and bool(aid), "INVALID_RECORD_ID", aid, "INVALID")
             for name in ("rarities", "pool_tags", "require_mods", "forbid_mods", "require_flags",
                          "forbid_flags", "set_flags", "clear_flags", "known_flags"):
@@ -255,10 +286,12 @@ class Dataset:
             raw["evidence"] = Evidence(**raw["evidence"])
             pools.append(PoolCertificate(**raw))
         return cls(data["domain"], data["version"], data["league"], records("bases", Base),
-                   records("modifiers", Modifier), records("actions", Action), tuple(pools))
+                   records("modifiers", Modifier), records("actions", Action), tuple(pools),
+                   records("flag_rules", FlagRule) if "flag_rules" in data else None)
 
 
 def dataset_document(data):
     return {"domain": data.domain, "version": data.version, "league": data.league,
             "bases": jsonable(list(data.bases.values())), "modifiers": jsonable(list(data.modifiers.values())),
-            "actions": jsonable(list(data.actions.values())), "pools": jsonable(data.pools)}
+            "actions": jsonable(list(data.actions.values())), "pools": jsonable(data.pools),
+            **({"flag_rules": jsonable(list(data.flag_rules.values()))} if data.flag_rules is not None else {})}

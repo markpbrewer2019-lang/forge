@@ -19,7 +19,8 @@ COMMANDS = ("inspect-item", "eligible-mods", "validate-action", "replay-route", 
             "compare-routes", "coverage", "future-conflicts", "explain-transition", "golden6",
             "ingest", "normalize-ninja", "demo", "failure-tree", "recover", "store-regression", "run-regressions",
             "market-leagues", "refresh-currency", "market-coverage", "currency-quote", "budget-distribution", "analyze-settle", "adversarial-test",
-            "build-craft", "audit-ladder", "compile-golden6", "data-search", "data-status", "data-import")
+            "build-craft", "audit-ladder", "compile-golden6", "data-search", "data-status", "data-import",
+            "catalog-build", "catalog-query", "catalog-audit", "catalog-rule")
 
 
 def prices_input(request):
@@ -34,6 +35,19 @@ def prices_input(request):
 
 
 def dispatch(command, request):
+    if command.startswith('catalog-') or (command == 'build-craft' and 'dataset' not in request):
+        from .source_store import SourceStore
+        from .catalog import Catalog
+        catalog = Catalog(SourceStore(request.get('directory', 'local-data/sources')))
+        if command == 'catalog-build':
+            return catalog.rebuild()
+        if command == 'catalog-query':
+            return catalog.query(**request.get('filters', {}))
+        if command == 'catalog-audit':
+            return catalog.audit()
+        if command == 'catalog-rule':
+            return catalog.property_rule(request['record_id'])
+        return catalog.resolve_craft(request)
     if command in {'data-search', 'data-status', 'data-import'}:
         from .source_store import SourceStore
         store = SourceStore(request.get('directory', 'local-data/sources'))

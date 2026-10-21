@@ -57,9 +57,12 @@ def category_urls(raw):
 
         def handle_starttag(self, tag, attrs):
             href = dict(attrs).get('href', '')
-            if tag == 'a' and re.fullmatch(r'/us/[A-Za-z0-9_().%~-]+#ModifiersCalc', href):
-                url = urljoin('https://poe2db.tw', href.split('#')[0])
-                validate_poe2db_url(url)
+            if tag == 'a' and urlsplit(href).fragment == 'ModifiersCalc':
+                url = urljoin('https://poe2db.tw/us/Modifiers', href).split('#')[0]
+                try:
+                    validate_poe2db_url(url)
+                except ForgeError:
+                    return
                 self.urls.add(url)
     parser = Links()
     parser.feed(raw.decode('utf-8'))

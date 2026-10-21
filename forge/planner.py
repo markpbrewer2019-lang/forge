@@ -5,13 +5,13 @@ import math
 
 from .model import ForgeError, Item, require, jsonable, rational
 from fractions import Fraction
-from .routes import target_matches
+from .routes import target_matches, validate_target_state
 from .economics import price_route
 
 
 def plan_ladder(engine, start, target, prices, max_states=30, max_policies=10000,
                 base_resource=None, base_owned=False, valuation_at=None, keeper_policy=None,
-                optimizer="enumerate", max_iterations=100, acceptable_settles=None):
+                optimizer="enumerate", max_iterations=100, acceptable_settles=None, target_state=None):
     engine.inspect(start)
     require(optimizer in {"enumerate", "policy_iteration"}, "UNKNOWN_OPTIMIZER", optimizer, "INVALID")
     from .keepers import KeeperPolicy
@@ -22,7 +22,9 @@ def plan_ladder(engine, start, target, prices, max_states=30, max_policies=10000
                 "UNSUPPORTED_SEARCH_KEEPER_POLICY", "Search currently proves strict monotone keeper accumulation. Replay supports explicit fallbacks/restarts.")
     rejected = []
     # Final requirements constrain the search before any action is selected.
-    engine.inspect(Item(start.base, start.ilvl, start.rarity, start.quality, tuple(target)))
+    require(target_state is None or isinstance(target_state, dict), "INVALID_TARGET_STATE", str(target_state), "INVALID")
+    target_state = {"rarity": start.rarity, **(target_state or {})}
+    validate_target_state(engine, start, target, target_state)
     states, options, blocked = {}, {}, []
     queue = deque([start])
     while queue:
@@ -31,7 +33,7 @@ def plan_ladder(engine, start, target, prices, max_states=30, max_policies=10000
             continue
         require(len(states) < max_states, "SEARCH_STATE_LIMIT", "No optimality claim; search incomplete")
         states[item.key] = item
-        if target_matches(item, target):
+        if target_matches(item, target, target_state):
             continue
         options[item.key] = []
         for action_id in sorted(engine.data.actions):
@@ -51,7 +53,7 @@ def plan_ladder(engine, start, target, prices, max_states=30, max_policies=10000
     dead_ends = {k for k, value in options.items() if not value}
     if optimizer == "policy_iteration":
         return _policy_iteration(engine, start, target, prices, states, options, blocked, rejected,
-                                 base_resource, base_owned, valuation_at, policy, acceptable_settles or [], max_iterations)
+                                 base_resource, base_owned, valuation_at, policy, acceptable_settles or [], max_iterations, target_state)
     options = {k: value for k, value in options.items() if value}
     count = math.prod(len(v) for v in options.values())
     require(count <= max_policies, "SEARCH_POLICY_LIMIT", f"{count} policies > {max_policies}; no partial winner")
@@ -60,7 +62,7 @@ def plan_ladder(engine, start, target, prices, max_states=30, max_policies=10000
     for selection in product(*(options[k] for k in keys)):
         nodes = {}
         for state_id, item in states.items():
-            if target_matches(item, target):
+            if target_matches(item, target, target_state):
                 nodes[state_id] = {"objective": "Exact target", "terminal": "success", "expected_state": jsonable(item)}
             elif state_id in dead_ends:
                 nodes[state_id] = {"objective": "No legal continuation in loaded action set", "terminal": "failure",
@@ -70,7 +72,7 @@ def plan_ladder(engine, start, target, prices, max_states=30, max_policies=10000
                                "action": action_id, "expected_state": jsonable(states[state_id]),
                                "branches": {o.label: o.state.key for o in outcomes}}
         candidate = {"schema_version": 1, "dataset_id": engine.data.key,
-                     "starting_state": jsonable(start), "target": list(target), "entry": start.key,
+                     "starting_state": jsonable(start), "target": list(target), "target_state": target_state, "entry": start.key,
                      "base_owned": base_owned, "nodes": nodes}
         if policy:
             candidate["keeper_policy"] = jsonable(policy)
@@ -104,16 +106,28 @@ def plan_ladder(engine, start, target, prices, max_states=30, max_policies=10000
 
 
 def _policy_iteration(engine, start, target, prices, states, options, blocked, rejected,
-                      base_resource, base_owned, valuation_at, keeper_policy, settles, max_iterations):
+                      base_resource, base_owned, valuation_at, keeper_policy, settles, max_iterations, target_state):
     """Exact stochastic shortest path with an almost-sure proper initial policy."""
     from .economics import solve
     from .routes import replay
     from .model import digest
     require(type(max_iterations) is int and max_iterations > 0, "INVALID_SEARCH_BOUND", str(max_iterations), "INVALID")
     prices.verify(engine, valuation_at)
-    targets = {k for k, item in states.items() if target_matches(item, target)}
+    targets = {k for k, item in states.items() if target_matches(item, target, target_state)}
+    # A settle is permissible only outside any reachable commitment suffix.
+    # Physical-state search conservatively shares this obligation when paths merge.
+    committed = {o.state.key for k, pairs in options.items() for aid, outcomes in pairs
+                 for o in outcomes if engine.is_commitment(states[k], o.state, aid)}
+    frontier = list(committed)
+    while frontier:
+        key = frontier.pop()
+        for _, outcomes in options.get(key, []):
+            for outcome in outcomes:
+                if outcome.state.key not in committed:
+                    committed.add(outcome.state.key)
+                    frontier.append(outcome.state.key)
     settle_states = {k for k, choices in options.items() if not choices and any(
-        set(s["required_modifiers"]) <= set(states[k].mods) for s in settles)}
+        set(s["required_modifiers"]) <= set(states[k].mods) for s in settles) and k not in committed}
     goals = targets | settle_states
     winning = set(states)
     ranks = {}
@@ -168,7 +182,7 @@ def _policy_iteration(engine, start, target, prices, states, options, blocked, r
                               "rung": str(len(acquired) + 1), "action": aid, "expected_state": jsonable(item),
                               "branches": {o.label: o.state.key for o in outcomes}}
         plan = {"schema_version": 1, "dataset_id": engine.data.key, "starting_state": jsonable(start),
-                "target": list(target), "entry": start.key, "nodes": nodes, "base_owned": base_owned}
+                "target": list(target), "target_state": target_state, "entry": start.key, "nodes": nodes, "base_owned": base_owned}
         if keeper_policy:
             plan["keeper_policy"] = jsonable(keeper_policy)
         if settles:
@@ -182,7 +196,7 @@ def _policy_iteration(engine, start, target, prices, states, options, blocked, r
                 candidates.append({"plan": plan, "economics": economics})
                 seen.add(signature)
         except ForgeError as exc:
-            if exc.code != "NO_SUCCESS_PATH":
+            if exc.code not in {"NO_SUCCESS_PATH", "UNPROVEN_COMMITMENT_SUFFIX"}:
                 raise
         changes = {}
         for key in active:

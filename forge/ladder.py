@@ -38,12 +38,15 @@ def audit_ladder(engine, plan, prices, valuation_at=None):
         classification, lost = policy.classify(before, after, target, action, result.terminals.get(destination))
         inspection = engine.inspect(before)
         keepers = policy.keepers(before, target) & set(before.mods)
+        lifecycle = {r["modifier"]: r for r in policy.lifecycle or [] if r["modifier"] in before.mods}
         transitions.append({**row, "classification": classification, "before_state": jsonable(before),
             "after_state": jsonable(after), "action_name": action.display_name or action.id,
             "mechanic_context": action.mechanic_context or {}, "resources": action.resources,
             "current_keepers": sorted(keepers), "physical_locks": {"protected": before.protected, "fractured": before.fractured},
             "earned_rungs": len(set(before.mods) & target), "locked_rungs": len(keepers & target),
-            "disposable_modifiers": sorted(set(before.mods) - keepers), "affix_capacity": inspection["open_slots"],
+            "disposable_modifiers": sorted(mid for mid in set(before.mods) - keepers
+                if mid not in lifecycle or lifecycle[mid]["role"] == "DISPOSABLE"),
+            "modifier_lifecycle": lifecycle, "affix_capacity": inspection["open_slots"],
             "modifier_groups": {mid: engine.modifier(mid).group for mid in before.mods},
             "objective": plan["nodes"][row["node"]]["objective"], "keeper_loss": lost,
             "advance_condition": {"new_exact_targets": sorted((set(after.mods) - set(before.mods)) & target)},

@@ -1,0 +1,13 @@
+{
+  "checkpoint": "source-planner-v1",
+  "date": "2026-10-21",
+  "parent_commit": "5ce785ef13961ffbf62a0cc1b7efdddf602e379e",
+  "tests": {"passed": 138, "failures": 0, "errors": 0},
+  "synthetic_proof": {"exact_ev": "23", "trials": 20000, "simulation_mean": "22.9649", "keeper_loss_probability": "0"},
+  "captured_source_audit": {"available": 30426, "matched": 30426, "missing": 0, "mismatched": 0, "extra": 0, "coverage_percent": "100", "modifier_occurrences": 26575, "base_card_occurrences": 3851, "distinct_source_base_ids": 2236, "inventory_urls": 122, "saved_inventory_urls": 121, "source_unavailable_urls": ["https://poe2db.tw/us/Misc_Map_Items"], "absent_weights": 1296, "absent_levels": 38, "absent_descriptions": 2, "conditional_weight_rows": 560},
+  "verified_real_game_pools": 0,
+  "blind_real_craft_ready": false,
+  "report": "docs/SOURCE_PLANNER_REPORT.md",
+  "persistent_library": "local-data/sources",
+  "next": "Review source-to-transition grammar, scope/pools/conditional weights and physical rules; implement numeric rolls and inferred lifecycle/recovery dependencies; verify an unfamiliar craft with current matching ninja-only prices."
+}

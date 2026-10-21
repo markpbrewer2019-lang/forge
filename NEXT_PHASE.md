@@ -1,5 +1,7 @@
 # Next phase
 
+Current continuation checkpoint: `checkpoints/source-planner-v1.json`; report `docs/SOURCE_PLANNER_REPORT.md`. 138 tests passed. Captured source rows 30,426/30,426 matched; discovered URLs 121/122 saved, remaining page HTTP 404. Real-game readiness remains NO. Read the report and local source catalog before new source research; do not repeat completed ingestion or commitment/lifecycle enforcement.
+
 Keeper planner checkpoint: checkpoints/keeper-planner-v1.json.
 
 Completed: synthetic six-mod keeper-safe pipeline; conditional Golden 6; typed evidence gates; 96 passing tests.

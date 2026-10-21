@@ -16,6 +16,25 @@ class Engine:
         data.validate_structure()
         self.data = data
 
+    def flag_rule(self, flag):
+        rule = (self.data.flag_rules or {}).get(flag)
+        require(rule is not None, "UNKNOWN_PROPERTY_RULE", flag)
+        rule.evidence.verify_mechanic(self.data.domain, self.data.version, self.data.league)
+        for name in ("permanent", "capacity_delta", "incompatible_flags", "forbidden_actions",
+                     "forbidden_operations", "occupied_sockets"):
+            require(getattr(rule, name) is not None, "UNKNOWN_PROPERTY_RULE", f"{flag}.{name}")
+        return rule
+
+    def physical_rules(self, item):
+        # Legacy datasets retain their existing action-specific known_flags gate.
+        return [self.flag_rule(flag) for flag in item.flags] if self.data.flag_rules is not None else []
+
+    def is_commitment(self, before, after, action_id=None):
+        if action_id is not None and self.action(action_id).irreversible:
+            return True
+        return (after.sockets != before.sockets or any(self.flag_rule(f).permanent or self.flag_rule(f).occupied_sockets
+                for f in set(after.flags) - set(before.flags))) if self.data.flag_rules is not None else after.sockets != before.sockets
+
     def modifier(self, mod_id):
         require(mod_id in self.data.modifiers, "UNKNOWN_MODIFIER", mod_id)
         m = self.data.modifiers[mod_id]
@@ -39,6 +58,13 @@ class Engine:
 
     def inspect(self, item):
         base = self.base(item)
+        rules = self.physical_rules(item)
+        for rule in rules:
+            require(not set(rule.incompatible_flags) & set(item.flags), "INCOMPATIBLE_PROPERTIES", rule.id, "INVALID")
+        occupied = sum(rule.occupied_sockets for rule in rules)
+        if occupied:
+            require(item.sockets is not None, "UNKNOWN_SOCKET_STATE", item.base)
+            require(occupied <= item.sockets, "SOCKET_CAPACITY_EXCEEDED", str(occupied), "INVALID")
         mods = [self.modifier(mid) for mid in item.mods]
         require(set(item.fractured) <= set(item.mods) and set(item.protected) <= set(item.mods),
                 "INVALID_PROTECTION", "Protected/fractured modifier absent", "INVALID")
@@ -50,7 +76,7 @@ class Engine:
             for other in mods[i + 1:]:
                 require(m.group != other.group and other.id not in m.conflicts and m.id not in other.conflicts,
                         "MODIFIER_GROUP_CONFLICT", f"{m.id} / {other.id}", "INVALID")
-        opened = {side: base.limits[item.rarity][side] - sum(m.side == side for m in mods)
+        opened = {side: base.limits[item.rarity][side] + sum(r.capacity_delta.get(side, 0) for r in rules) - sum(m.side == side for m in mods)
                   for side in ("prefix", "suffix")}
         require(all(v >= 0 for v in opened.values()), "AFFIX_CAPACITY_EXCEEDED", str(opened), "INVALID")
         return {"state": jsonable(item), "state_id": item.key, "item_class": base.item_class,
@@ -80,6 +106,9 @@ class Engine:
         evidence = {"mechanic": action.evidence.provenance(),
                     "base": self.base(item).evidence.provenance(),
                     "existing_modifiers": {mid: self.modifier(mid).evidence.provenance() for mid in item.mods}}
+        if self.data.flag_rules is not None:
+            evidence["physical_properties"] = {flag: self.flag_rule(flag).evidence.provenance()
+                for flag in sorted(set(item.flags) | set(action.set_flags))}
         if action.operation == "add_pool":
             pool = self.pool(item, action_id)
             certificate = next(p for p in self.data.pools if p.base == item.base and p.action == action_id
@@ -154,6 +183,17 @@ class Engine:
     def legality(self, item, action_id):
         info = self.inspect(item)
         action = self.action(action_id)
+        for rule in self.physical_rules(item):
+            require(action.id not in rule.forbidden_actions and action.operation not in rule.forbidden_operations,
+                    "PROPERTY_FORBIDDEN_ACTION", {"flag": rule.id, "action": action.id}, "INVALID")
+            require(not ((rule.permanent or rule.occupied_sockets) and rule.id in action.clear_flags),
+                    "PERMANENT_PROPERTY_REMOVAL", rule.id, "INVALID")
+        if self.data.flag_rules is not None:
+            for flag in action.set_flags:
+                self.flag_rule(flag)
+        if action.socket_delta is not None:
+            require(item.sockets is not None, "UNKNOWN_SOCKET_STATE", item.base)
+            require(item.sockets + action.socket_delta >= 0, "SOCKET_CAPACITY_EXCEEDED", action.id, "INVALID")
         require(set(item.flags) <= set(action.known_flags), "UNKNOWN_INTERACTION",
                 {"action": action_id, "unhandled_flags": sorted(set(item.flags) - set(action.known_flags))})
         require(item.rarity in action.rarities, "WRONG_ITEM_RARITY", action_id, "INVALID")
@@ -186,6 +226,8 @@ class Engine:
         a = self.action(action_id)
         common = {"flags": tuple((set(item.flags) - set(a.clear_flags)) | set(a.set_flags)),
                   "rarity": a.resulting_rarity or item.rarity}
+        if a.socket_delta is not None:
+            common["sockets"] = item.sockets + a.socket_delta
         outcomes = []
         if a.operation == "add_pool":
             pool = self.pool(item, action_id)
@@ -239,7 +281,7 @@ def explain(before, after, engine):
     b, a = engine.inspect(before), engine.inspect(after)
     added, removed = sorted(set(after.mods) - set(before.mods)), sorted(set(before.mods) - set(after.mods))
     changes = {name: {"before": getattr(before, name), "after": getattr(after, name)}
-               for name in ("base", "ilvl", "rarity", "quality", "fractured", "protected", "flags")
+               for name in ("base", "ilvl", "rarity", "quality", "fractured", "protected", "flags", "sockets")
                if getattr(before, name) != getattr(after, name)}
     return {"added": added, "removed": removed, "preserved": sorted(set(before.mods) & set(after.mods)),
             "open_slots": {side: [b["open_slots"][side], a["open_slots"][side]] for side in ("prefix", "suffix")},

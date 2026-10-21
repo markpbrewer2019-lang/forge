@@ -30,7 +30,7 @@ Pass that request to `python -m forge data-search --input request.json`. A new e
 python tools/sync_sources.py --market-file market-data/currency.json
 ```
 
-The synchronizer follows category links actually present in PoE2DB's Modifiers index, parses the category's literal embedded `ModsView` JSON without executing JavaScript, and preserves the HTML response. Existing sources are reused without network requests. Missing sources are downloaded sequentially with an interval, a response-size cap, no redirects, and no persistence of `no-store` responses. A changed robots contract or modifier schema blocks acquisition; individual category failures are reported without removing good saved records.
+The synchronizer follows relative and absolute links actually present in PoE2DB's Modifiers index. With `--all-items`, it also follows the Items index and auxiliary modifier categories. It parses literal `ModsView` JSON without executing JavaScript and preserves HTML tables and base cards. Existing sources are reused offline. Downloads are sequential, bounded and do not follow redirects. Automatic HTTP caching honors `no-store`; `--archive-public-pages` explicitly archives public unauthenticated source documents as user-requested research data. This flag does not change the poe.ninja client's HTTP cache rules. A changed robots contract or modifier schema blocks acquisition; failures preserve good saved records.
 
 `--refresh` explicitly reacquires PoE2DB pages. This does not refresh market prices. For a new market observation, run the existing `refresh-currency` command with an actual discovered league and then import its JSON result with `--market-file`. The original API cache still preserves the exact market response bytes; the source library additionally indexes its canonical JSON fields. No alternative currency provider or manual price override is accepted.
 
@@ -44,8 +44,36 @@ The synchronizer follows category links actually present in PoE2DB's Modifiers i
 
 Tests exercise offline recall, process-style reopening, immutable revision history, raw corruption, schema changes, source restrictions, preserved API prices/times, and CLI dispatch. They use labeled test data; real observations are stored separately.
 
-## Acquisition checkpoint
+## Initial acquisition checkpoint (superseded)
 
 The initial acquisition saved all **63 category URLs discovered in the live Modifiers index**, comprising **23,753 modifier rows** across those categories, plus **51 historical API currency observations**. Rows can repeat across item classes; this is not a count of unique verified modifiers or a claim of all PoE2DB coverage. `local-data/sources/coverage.json` contains the actual local inventory and zero acquisition failures. Every raw blob was hash-checked, and live local modifier/currency lookup succeeded in a new process with HTTP access disabled.
 
 Final verification: **113 tests, zero failures/errors**, including 14 source-recall regressions. The existing six-mod synthetic simulation still agrees with exact EV 23. Independent review identified a changed-index false-success path and legacy market-time relabeling; both were reproduced by failing tests and fixed before completion.
+
+## Source catalog and current recall
+
+```text
+python tools/sync_sources.py --all-items --catalog --archive-public-pages --market-file market-data/currency.json
+python -m forge catalog-build
+python -m forge catalog-audit
+```
+
+The JSON requests for `catalog-query` and `catalog-rule` are:
+
+```json
+{"filters":{"kind":"modifier","item_class":"Wands","pool":"normal","min_ilvl":1,"max_ilvl":80,"text":"maximum Life","limit":20}}
+```
+
+```json
+{"filters":{"kind":"base","record_id":"Rusted_Cuirass"}}
+```
+
+```json
+{"record_id":"Serles_Triumph"}
+```
+
+Queries expose exact reported levels, scalar weights or ordered conditional weight entries, source IDs, family/filter metadata, base stats, equip requirements and raw source references. Query/build/audit use the local library without HTTP. Static rows with missing descriptions/weights are retained explicitly. Conditional weights remain conditional; no scalar value or condition match is invented. See `SOURCE_FIELD_CONTRACT.md` for the presentation-field mapping and its limits.
+
+The audit counts raw JSON/table/card structures separately from projection and checks every projected payload plus the indexed columns driving queries. A projection count gap, missing row, changed indexed field or checksum failure prevents a clean audit. Its denominator is the **captured source inventory**, not hidden game data or a claim that every site page has been discovered. `inventory.json` records discovered/saved URLs and SOURCE_UNAVAILABLE versus INGESTION_FAILURE. Counts are source occurrences across page/class/pool scopes, not unique verified game modifiers.
+
+`build-craft` without a supplied reviewed dataset resolves the starting base and exact target IDs through this library, checks available level requirements, and returns specific missing-source/interpretation/rule diagnostics. It produces no Golden 6 until the actual craft is provable. This preflight is not the finished real-game solver.
