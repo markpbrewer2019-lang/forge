@@ -1,5 +1,7 @@
 # Forge crafting intelligence toolchain
 
+**Offline source recall:** PoE2DB modifier observations and saved poe.ninja quotes can now be queried from the persistent `local-data/sources/` library without network access. See [local data instructions](docs/LOCAL_DATA.md). This source library does not automatically certify records for solver use.
+
 Keeper-planner continuation: `build-craft` now connects exact six-target input, strict keeper-safe policy iteration, replay, full-route pricing, adaptive recovery audit and a conditional Golden 6 compiler. Fresh verification: **99 tests** (96 crafting/integration tests plus 3 repository-audit tests), plus a **20,000-trial** integrated six-mod synthetic proof (exact expected cost 23; simulation mean 22.9649). Read [the keeper planner scope](docs/keeper-planner.md) and [continuation checklist](docs/keeper-planner-checklist.md) for exact boundaries. Real modifier/mechanic coverage remains zero.
 
 Working Python 3.11+ correctness harness. Standard library only. No UI, no recipe-specific solver logic, no real PoE2 recipes yet.

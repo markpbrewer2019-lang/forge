@@ -16,3 +16,9 @@
 - Missing pool completeness, scope, weights, evidence, or prices must block dependent calculations.
 - Keep source access outside the solver. Preserve source snapshots and provenance.
 - All real currency market data MUST originate from the poe.ninja PoE2 economy API. No manual prices, alternate providers, PoE1 endpoints, or silent fallback. Preserve the API snapshot and match quotes to it. Synthetic fixtures remain SYNTHETIC.
+
+# Recall saved sources before browsing
+
+- Persistent PoE2DB and poe.ninja observations are in `local-data/sources/`. This is user data; never clear it as disposable cache.
+- Read `docs/LOCAL_DATA.md`, then use `forge.source_store.SourceStore` or the `data-status` / `data-search` CLI before revisiting sources. Both are offline; explicit acquisition is `tools/sync_sources.py`.
+- Preserve snapshot hashes, URLs, revisions, observation ages and per-field unknowns. Local availability is not verification of game semantics or pool completeness.

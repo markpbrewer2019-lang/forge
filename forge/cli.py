@@ -19,7 +19,7 @@ COMMANDS = ("inspect-item", "eligible-mods", "validate-action", "replay-route", 
             "compare-routes", "coverage", "future-conflicts", "explain-transition", "golden6",
             "ingest", "normalize-ninja", "demo", "failure-tree", "recover", "store-regression", "run-regressions",
             "market-leagues", "refresh-currency", "market-coverage", "currency-quote", "budget-distribution", "analyze-settle", "adversarial-test",
-            "build-craft", "audit-ladder", "compile-golden6")
+            "build-craft", "audit-ladder", "compile-golden6", "data-search", "data-status", "data-import")
 
 
 def prices_input(request):
@@ -34,6 +34,20 @@ def prices_input(request):
 
 
 def dispatch(command, request):
+    if command in {'data-search', 'data-status', 'data-import'}:
+        from .source_store import SourceStore
+        store = SourceStore(request.get('directory', 'local-data/sources'))
+        if command == 'data-search':
+            return store.search(request['query'], source=request.get('source'), limit=request.get('limit', 20))
+        if command == 'data-status':
+            return store.coverage()
+        raw = Path(request['file']).read_bytes()
+        if request['source'] == 'poe.ninja':
+            return store.put_market(json.loads(raw))
+        if request['source'] == 'poe2db':
+            return store.put_poe2db(request['url'], raw, retrieved_at=request['retrieved_at'],
+                                   version=request.get('version', 'UNKNOWN'))
+        raise ForgeError('UNKNOWN_DATA_SOURCE', request['source'], 'INVALID')
     if command in {"market-leagues", "refresh-currency", "market-coverage", "currency-quote"}:
         from .market import NinjaClient, market_coverage, currency_quote
         if command == "market-coverage":

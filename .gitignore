@@ -39,6 +39,8 @@ Thumbs.db
 # Reproducible runtime reports and live API caches: retain locally, never source truth
 /reports/
 /market-data/
+# Persistent local source library: preserve on disk; separate from code and disposable caches.
+/local-data/
 /demo.json
 /*-results.json
 /route-economics.json
